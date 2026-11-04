@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.vite/
+*.log
+.DS_Store
+npm-debug.log*
+out/
+test-db-*.sqlite*
+.env
+.env.*
+!.env.example

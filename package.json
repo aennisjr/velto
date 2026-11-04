@@ -1,0 +1,48 @@
+{
+  "name": "velto",
+  "version": "0.1.4",
+  "private": true,
+  "description": "Local-first desktop text library and canned response app",
+  "main": "dist/src/main/index.js",
+  "type": "module",
+  "scripts": {
+    "build:preload": "esbuild src/preload/index.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist/preload/index.cjs",
+    "dev": "npm run build:preload && tsc --project tsconfig.json && concurrently -k -n vite,electron \"vite --host 127.0.0.1 --strictPort\" \"wait-on http://127.0.0.1:5173 && cross-env VELTO_DEV_SERVER_URL=http://127.0.0.1:5173 electron-forge start\"",
+    "build": "tsc --project tsconfig.json && npm run build:preload && vite build --config vite.config.ts",
+    "test": "vitest run",
+    "test:e2e": "npm run build && node tests/e2e/smoke.e2e.mjs && node tests/e2e/transfer.e2e.mjs && node tests/e2e/shell.e2e.mjs && node tests/e2e/quick.e2e.mjs && node tests/e2e/organize.e2e.mjs && node tests/e2e/bulk-delete.e2e.mjs && node tests/e2e/capture.e2e.mjs && node tests/e2e/variables.e2e.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx",
+    "package": "npm run build && electron-forge package",
+    "make": "npm run build && electron-forge make"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "electron-squirrel-startup": "^1.0.1",
+    "highlight.js": "^11.12.0",
+    "lucide-react": "^1.55.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sqlite3": "^6.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^8.0.1",
+    "@electron-forge/maker-squirrel": "^8.0.1",
+    "@types/node": "^22.20.5",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/sqlite3": "^3.1.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "concurrently": "^9.1.2",
+    "cross-env": "^10.1.0",
+    "electron": "^44.7.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.0.0",
+    "playwright": "^1.45.0",
+    "typescript": "^5.5.4",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3",
+    "wait-on": "^9.5.1"
+  }
+}
