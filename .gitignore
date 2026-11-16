@@ -10,3 +10,4 @@ test-db-*.sqlite*
 .env
 .env.*
 !.env.example
+.upgrade-cache/

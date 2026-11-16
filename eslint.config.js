@@ -4,7 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 
 export default [
-    { ignores: ['node_modules/**', 'dist/**', 'out/**', 'coverage/**', '.vite/**'] },
+    { ignores: ['node_modules/**', 'dist/**', 'out/**', 'coverage/**', '.vite/**', '.upgrade-cache/**'] },
     js.configs.recommended,
     ...tseslint.configs.recommended,
     {
@@ -12,7 +12,7 @@ export default [
         languageOptions: { globals: globals.node },
     },
     {
-        files: ['tests/e2e/**/*.mjs'],
+        files: ['tests/e2e/**/*.mjs', 'tests/upgrade/**/*.mjs'],
         languageOptions: { globals: globals.browser },
     },
     {

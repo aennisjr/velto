@@ -56,6 +56,7 @@ Useful checks:
 - `npm run lint` — ESLint checks
 - `npm test` — unit tests
 - `npm run test:e2e` — build and run the Electron end-to-end tests
+- `npm run test:upgrade` — package the current tree and a baseline release, then confirm a library created by the baseline opens intact (see below)
 - `npm run build` — compile the main process, preload, and renderer
 
 ## Windows release
@@ -64,7 +65,11 @@ Run `npm run make` on Windows to build the Squirrel.Windows installer. The insta
 
 The installer is per-user. Velto stores its SQLite library and automatic backups in Electron's per-user `userData` directory, outside the installed application directory, so replacing the app during an update does not replace the library. Back up or export the library before testing an installer upgrade.
 
-Installer installation and in-place upgrade should be verified on a clean Windows test account before distributing a release.
+Before a release, run `npm run test:upgrade` to check that existing libraries survive the upgrade. It packages the newest `v*` tag (or the first commit when there are no tags) and the current tree, creates a varied library with the old build, then opens it with the new build and checks entries, templates, tags, categories, settings, search, and database integrity. Pass `--from <git ref>` to choose another baseline, or `--skip-build` to reuse the current `out/` build. Baseline builds are cached in `.upgrade-cache/`. Each run uses a temporary data folder, so an installed copy of Velto is not affected.
+
+Bump `version` in `package.json` for every release: Squirrel only offers an update with a higher version, and the upgrade test warns when the version has not changed. Tag each release (for example, `git tag v0.1.5`) so the next upgrade test starts from it.
+
+The test does not run the installer itself. Installer installation and in-place upgrade should still be verified on a clean Windows test account before distributing a release.
 
 ## Folder structure
 
