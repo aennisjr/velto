@@ -52,6 +52,33 @@ describe('migrations', () => {
         expect(await version(db)).toBe(loadMigrations().length);
     });
 
+    it('adds empty fields to existing version 4 entries', async () => {
+        const db = track(new sqlite3.Database(':memory:'));
+        const migrations = loadMigrations();
+        await runMigrations(db, migrations.slice(0, 4));
+        await new Promise<void>((resolve, reject) => db.run(
+            "INSERT INTO entries (id, title, content, created_at, updated_at) VALUES ('old', 'Old', 'body', 'a', 'a')",
+            (error) => error ? reject(error) : resolve(),
+        ));
+        await runMigrations(db, migrations);
+        expect(await all(db, 'SELECT title, content, fields FROM entries')).toEqual([{ title: 'Old', content: 'body', fields: '[]' }]);
+    });
+
+    it('removes existing unused tags without removing tags on archived entries', async () => {
+        const db = track(new sqlite3.Database(':memory:'));
+        const migrations = loadMigrations();
+        await runMigrations(db, migrations.slice(0, 3));
+        await new Promise<void>((resolve, reject) => db.exec(`
+            INSERT INTO entries (id, title, content, created_at, updated_at, is_archived) VALUES ('archived', 'Archived', '', 'a', 'a', 1);
+            INSERT INTO tags (id, name, created_at) VALUES ('unused', 'Unused', 'a'), ('used', 'Used', 'a');
+            INSERT INTO entry_tags (entry_id, tag_id) VALUES ('archived', 'used');
+        `, (error) => (error ? reject(error) : resolve())));
+        await runMigrations(db, migrations);
+        expect(await all(db, 'SELECT name FROM tags')).toEqual([{ name: 'Used' }]);
+        expect(await all(db, 'SELECT entry_id, tag_id FROM entry_tags')).toEqual([{ entry_id: 'archived', tag_id: 'used' }]);
+        expect(await version(db)).toBe(5);
+    });
+
     it('applies only pending migrations, in order', async () => {
         const db = track(new sqlite3.Database(':memory:'));
         const steps: Migration[] = [

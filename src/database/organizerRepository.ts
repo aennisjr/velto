@@ -78,8 +78,8 @@ export async function listTagUsage(db: Database): Promise<TagSummary[]> {
         db,
         `SELECT t.name AS name, COUNT(e.id) AS count
          FROM tags t
-         LEFT JOIN entry_tags et ON et.tag_id = t.id
-         LEFT JOIN entries e ON e.id = et.entry_id AND e.is_archived = 0
+         JOIN entry_tags et ON et.tag_id = t.id
+         JOIN entries e ON e.id = et.entry_id
          GROUP BY t.id ORDER BY t.name COLLATE NOCASE`,
     );
     return rows.map((row) => ({ name: String(row.name), count: Number(row.count) }));

@@ -73,6 +73,19 @@ try {
     await page.locator('.item', { hasText: 'Refund note' }).click();
     assert.equal(await page.locator('.entry-category').count(), 0, 'entry is now uncategorized');
 
+    // Removing the final use deletes the tag; archiving does not.
+    await page.getByRole('button', { name: /^Edit/ }).click();
+    await page.getByPlaceholder(/^Tags/).fill('retained');
+    await page.getByRole('button', { name: /^Save/ }).click();
+    await page.getByText('Saved').waitFor();
+    await page.getByRole('button', { name: 'Archive', exact: true }).click();
+    await page.getByText('Archived', { exact: true }).first().waitFor();
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const tagList = page.getByRole('group', { name: 'Tags' });
+    await tagList.getByRole('button', { name: 'Rename retained' }).waitFor();
+    assert.equal(await tagList.getByRole('button', { name: /Rename urgent/i }).count(), 0);
+    assert.equal(await tagList.locator('.manage-count').innerText(), '1', 'archived entry is included in the tag count');
+
     console.log('ORGANIZE E2E PASSED');
 } finally {
     await app?.close().catch(() => undefined);

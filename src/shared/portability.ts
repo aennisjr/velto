@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { TemplateVariableSchema } from './validators.js';
+import { EntryFieldsSchema, TemplateVariableSchema } from './validators.js';
 import { SYNTAX_LANGUAGE_VALUES } from './syntaxLanguages.js';
 
 export const LIBRARY_FORMAT = 'velto-library';
-export const LIBRARY_FORMAT_VERSION = 4;
+export const LIBRARY_FORMAT_VERSION = 5;
 export const MAX_IMPORT_ENTRIES = 50000;
 export const MAX_IMPORT_BYTES = 100 * 1024 * 1024;
 
@@ -16,6 +16,7 @@ export const ExportedEntrySchema = z.object({
     id: z.string().min(1).max(128),
     title: z.string().trim().min(1).max(200),
     content: z.string().max(500000),
+    fields: EntryFieldsSchema.default([]),
     syntax_language: z.enum(SYNTAX_LANGUAGE_VALUES).default('plaintext'),
     description: z.string().max(2000).optional(),
     category: z.string().trim().min(1).max(50).optional(),

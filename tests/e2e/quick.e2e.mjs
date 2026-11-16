@@ -71,7 +71,7 @@ try {
 
     // Usage was recorded, so the entry is now "recent"
     const recent = await library.evaluate(() => window.velto.listEntries({ view: 'recent' }));
-    assert.deepEqual(recent.map((e) => e.title), ['Refund policy']);
+    assert.deepEqual(recent.rows.map((e) => e.title), ['Refund policy']);
 
     // Reopening resets the query and arrow keys move the selection
     await toggleViaSecondInstance();
@@ -102,6 +102,28 @@ try {
     assert.equal(await app.evaluate(({ clipboard }) => clipboard.readText()), 'Hello Ada, welcome to Velto!');
     assert.equal((await quickVisible()).visible, false, 'hidden after template copy');
 
+    // A template with a field-only placeholder opens the form and can copy that field.
+    await library.evaluate(() => window.velto.createEntry({
+        title: 'Field template', content: 'Body', is_template: true,
+        fields: [{ label: 'Subject', value: 'Hello %person%' }],
+    }));
+    await toggleViaSecondInstance();
+    await quick.getByRole('combobox').fill('subject');
+    await quick.getByRole('option', { name: /Field template/ }).waitFor();
+    await quick.keyboard.press('Enter');
+    await quick.locator('.field-group', { hasText: 'Person' }).locator('textarea').fill('Ada');
+    const copyBox = await quick.getByRole('button', { name: /Copy result/ }).boundingBox();
+    const fieldBox = await quick.getByRole('region', { name: 'Subject' }).boundingBox();
+    assert.ok(copyBox.y + copyBox.height <= fieldBox.y, 'additional fields follow copy result in Quick Search');
+    const valueBox = await quick.getByRole('region', { name: 'Subject' }).locator('.preview').boundingBox();
+    const fieldCopyBox = await quick.getByRole('button', { name: 'Copy Subject' }).boundingBox();
+    assert.equal(await quick.getByRole('button', { name: 'Copy Subject' }).innerText(), 'Copy');
+    assert.ok(fieldCopyBox.x >= valueBox.x + valueBox.width && fieldCopyBox.y < valueBox.y + valueBox.height, 'field copy is beside its value in Quick Search');
+    await quick.getByRole('button', { name: 'Copy Subject' }).click();
+    await sleep(300);
+    assert.equal(await app.evaluate(({ clipboard }) => clipboard.readText()), 'Hello Ada');
+    assert.equal((await quickVisible()).visible, false);
+
     // Blur hides it
     await toggleViaSecondInstance();
     assert.equal((await quickVisible()).visible, true);
@@ -113,6 +135,25 @@ try {
     });
     await sleep(500);
     assert.equal((await quickVisible()).visible, false, 'hides on blur');
+
+    // Both result lists announce when matches are truncated.
+    await library.evaluate(async () => {
+        for (let i = 0; i < 51; i++) {
+            await window.velto.createEntry({ title: `Limit ${i}`, content: 'limitmatch' });
+        }
+    });
+    await library.getByLabel('Search entries').fill('limitmatch');
+    await library.getByText('Showing first 50 results, refine your search.').waitFor();
+    assert.equal(await library.locator('.item').count(), 50);
+    await toggleViaSecondInstance();
+    await quick.getByText('Showing first 12 results, refine your search.').waitFor();
+    await quick.getByRole('combobox').fill('limitmatch');
+    await quick.getByText('Showing first 50 results, refine your search.').waitFor();
+    assert.equal(await quick.getByRole('option').count(), 50);
+    await quick.getByRole('combobox').fill('refund');
+    await quick.getByRole('option', { name: /Refund policy/ }).waitFor();
+    assert.equal(await quick.getByText(/Showing first/).count(), 0);
+    await quick.evaluate(() => window.velto.hideQuickSearch());
 
     // Shortcut status is reported and shown in settings
     const status = await library.evaluate(() => window.velto.getSettings()).then((state) => state.shortcuts.quickSearch);

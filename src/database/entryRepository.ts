@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { Database } from 'sqlite3';
-import type { LibraryEntry, ListFilter, SearchResult, TemplateVariable } from '../shared/types.js';
-import { parseTemplateVariables } from '../shared/template.js';
-import { LibraryEntryDraftSchema, type LibraryEntryDraft } from '../shared/validators.js';
+import type { EntryField, EntryResults, LibraryEntry, ListFilter, SearchResult, TemplateVariable } from '../shared/types.js';
+import type { SyntaxLanguage } from '../shared/syntaxLanguages.js';
+import { entryVariableNames } from '../shared/template.js';
+import { EntryFieldsSchema, LibraryEntryDraftSchema, type LibraryEntryDraft } from '../shared/validators.js';
 
 type Row = Record<string, unknown>;
 
@@ -121,6 +122,7 @@ function toEntry(row: Row, tags: string[], variables: TemplateVariable[]): Libra
         id: String(row.id),
         title: String(row.title),
         content: String(row.content),
+        fields: EntryFieldsSchema.parse(JSON.parse(String(row.fields))),
         syntax_language: String(row.syntax_language ?? 'plaintext') as LibraryEntry['syntax_language'],
         description: row.description == null ? undefined : String(row.description),
         category_id: row.category_id == null ? undefined : String(row.category_id),
@@ -142,7 +144,15 @@ async function hydrate(db: Database, rows: Row[]): Promise<LibraryEntry[]> {
     return rows.map((row) => toEntry(row, tags.get(String(row.id)) ?? [], variables.get(String(row.id)) ?? []));
 }
 
+async function deleteUnusedTags(db: Database, ids: string[]): Promise<void> {
+    if (ids.length > 0) {
+        await run(db, `DELETE FROM tags WHERE id IN (${ids.map(() => '?').join(',')})
+            AND NOT EXISTS (SELECT 1 FROM entry_tags WHERE tag_id = tags.id)`, ids);
+    }
+}
+
 export async function setTags(db: Database, entryId: string, tags: string[]): Promise<void> {
+    const previous = await all(db, 'SELECT tag_id FROM entry_tags WHERE entry_id = ?', [entryId]);
     await run(db, 'DELETE FROM entry_tags WHERE entry_id = ?', [entryId]);
 
     for (const name of normalizeTags(tags)) {
@@ -153,11 +163,12 @@ export async function setTags(db: Database, entryId: string, tags: string[]): Pr
         }
         await run(db, 'INSERT OR IGNORE INTO entry_tags (entry_id, tag_id) VALUES (?, ?)', [entryId, tagId]);
     }
+    await deleteUnusedTags(db, previous.map((row) => String(row.tag_id)));
 }
 
-// Definitions only exist for placeholders still in the content. When none are supplied, existing ones are kept (minus stale names).
-export async function setVariables(db: Database, entryId: string, content: string, variables?: TemplateVariable[]): Promise<void> {
-    const present = new Set(parseTemplateVariables(content).uniqueNames);
+// Definitions are retained only while their placeholders appear in content or fields.
+export async function setVariables(db: Database, entryId: string, content: string, fields: EntryField[], variables?: TemplateVariable[]): Promise<void> {
+    const present = new Set(entryVariableNames(content, fields));
 
     if (variables === undefined) {
         const rows = await all(db, 'SELECT name FROM template_variables WHERE entry_id = ?', [entryId]);
@@ -194,7 +205,7 @@ export async function reindex(db: Database, entryId: string): Promise<void> {
     await run(
         db,
         `INSERT INTO entries_fts (rowid, title, content, description, category_name, tag_names)
-         SELECT e.rowid, e.title, e.content, COALESCE(e.description, ''),
+         SELECT e.rowid, e.title, e.content || ' ' || COALESCE((SELECT group_concat(json_extract(value, '$.label') || ' ' || json_extract(value, '$.value'), ' ') FROM json_each(e.fields)), ''), COALESCE(e.description, ''),
                 COALESCE((SELECT name FROM categories WHERE id = e.category_id), ''),
                 COALESCE((SELECT group_concat(t.name, ' ') FROM entry_tags et JOIN tags t ON t.id = et.tag_id WHERE et.entry_id = e.id), '')
          FROM entries e WHERE e.id = ?`,
@@ -218,12 +229,12 @@ export async function createEntry(db: Database, input: LibraryEntryDraft): Promi
     return transaction(db, async () => {
         await run(
             db,
-            `INSERT INTO entries (id, title, content, syntax_language, description, category_id, is_favorite, is_template, is_archived, created_at, updated_at, use_count)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-            [id, draft.title, draft.content, draft.syntax_language, draft.description ?? null, draft.category_id ?? null, Number(draft.is_favorite), Number(draft.is_template), Number(draft.is_archived), now, now],
+            `INSERT INTO entries (id, title, content, fields, syntax_language, description, category_id, is_favorite, is_template, is_archived, created_at, updated_at, use_count)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+            [id, draft.title, draft.content, JSON.stringify(draft.fields ?? []), draft.syntax_language, draft.description ?? null, draft.category_id ?? null, Number(draft.is_favorite), Number(draft.is_template), Number(draft.is_archived), now, now],
         );
         await setTags(db, id, draft.tags);
-        await setVariables(db, id, draft.content, draft.variables as TemplateVariable[] | undefined);
+        await setVariables(db, id, draft.content, draft.fields ?? [], draft.variables);
         await reindex(db, id);
         return getEntryById(db, id);
     });
@@ -234,19 +245,20 @@ export async function updateEntry(db: Database, input: LibraryEntryDraft & { id:
     const id = input.id;
 
     return transaction(db, async () => {
-        const existing = await get(db, 'SELECT id FROM entries WHERE id = ?', [id]);
+        const existing = await get(db, 'SELECT fields FROM entries WHERE id = ?', [id]);
         if (!existing) {
             throw new Error(`Entry not found: ${id}`);
         }
 
+        const fields = draft.fields ?? EntryFieldsSchema.parse(JSON.parse(String(existing.fields)));
         await run(
             db,
-            `UPDATE entries SET title = ?, content = ?, syntax_language = ?, description = ?, category_id = ?, is_favorite = ?, is_template = ?, is_archived = ?, updated_at = ?
+            `UPDATE entries SET title = ?, content = ?, fields = ?, syntax_language = ?, description = ?, category_id = ?, is_favorite = ?, is_template = ?, is_archived = ?, updated_at = ?
              WHERE id = ?`,
-            [draft.title, draft.content, draft.syntax_language, draft.description ?? null, draft.category_id ?? null, Number(draft.is_favorite), Number(draft.is_template), Number(draft.is_archived), new Date().toISOString(), id],
+            [draft.title, draft.content, JSON.stringify(fields), draft.syntax_language, draft.description ?? null, draft.category_id ?? null, Number(draft.is_favorite), Number(draft.is_template), Number(draft.is_archived), new Date().toISOString(), id],
         );
         await setTags(db, id, draft.tags);
-        await setVariables(db, id, draft.content, draft.variables as TemplateVariable[] | undefined);
+        await setVariables(db, id, draft.content, fields, draft.variables);
         await reindex(db, id);
         return getEntryById(db, id);
     });
@@ -270,6 +282,7 @@ export function deleteEntries(db: Database, ids: string[]): Promise<void> {
         await run(db, `DELETE FROM entries_fts WHERE rowid IN (${rows.map(() => '?').join(', ')})`, rows.map((row) => row.rid));
         await run(db, `DELETE FROM template_variables WHERE entry_id IN (${placeholders})`, ids);
         await run(db, `DELETE FROM entry_tags WHERE entry_id IN (${placeholders})`, ids);
+        await run(db, 'DELETE FROM tags WHERE NOT EXISTS (SELECT 1 FROM entry_tags WHERE tag_id = tags.id)');
         await run(db, `DELETE FROM entries WHERE id IN (${placeholders})`, ids);
     });
 }
@@ -279,6 +292,7 @@ export async function duplicateEntry(db: Database, id: string): Promise<LibraryE
     return createEntry(db, {
         title: `${source.title} (copy)`.slice(0, 200),
         content: source.content,
+        fields: source.fields,
         syntax_language: source.syntax_language,
         description: source.description,
         category_id: source.category_id,
@@ -297,13 +311,27 @@ export function toggleFavorite(db: Database, id: string): Promise<LibraryEntry> 
     });
 }
 
+export function setArchived(db: Database, id: string, value: boolean): Promise<LibraryEntry> {
+    return transaction(db, async () => {
+        await run(db, 'UPDATE entries SET is_archived = ? WHERE id = ?', [Number(value), id]);
+        return getEntryById(db, id);
+    });
+}
+
+export function setSyntaxLanguage(db: Database, id: string, language: SyntaxLanguage): Promise<LibraryEntry> {
+    return transaction(db, async () => {
+        await run(db, 'UPDATE entries SET syntax_language = ? WHERE id = ?', [language, id]);
+        return getEntryById(db, id);
+    });
+}
+
 export function recordUse(db: Database, id: string): Promise<void> {
     return transaction(db, () =>
         run(db, 'UPDATE entries SET use_count = use_count + 1, last_used_at = ? WHERE id = ?', [new Date().toISOString(), id]),
     );
 }
 
-export async function listEntries(db: Database, filter: ListFilter = { view: 'all' }): Promise<LibraryEntry[]> {
+function filterEntries(filter: ListFilter): { where: string[]; params: unknown[]; order: string } {
     const where: string[] = [filter.view === 'archived' ? 'e.is_archived = 1' : 'e.is_archived = 0'];
     const params: unknown[] = [];
     let order = 'e.updated_at DESC';
@@ -325,8 +353,14 @@ export async function listEntries(db: Database, filter: ListFilter = { view: 'al
         params.push(filter.category_id);
     }
 
-    const rows = await all(db, `SELECT e.* FROM entries e WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT 5000`, params);
-    return hydrate(db, rows);
+    return { where, params, order };
+}
+
+export async function listEntries(db: Database, filter: ListFilter = { view: 'all' }): Promise<EntryResults<LibraryEntry>> {
+    const { where, params, order } = filterEntries(filter);
+    const limit = 5000;
+    const rows = await all(db, `SELECT e.* FROM entries e WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT ?`, [...params, limit + 1]);
+    return { rows: await hydrate(db, rows.slice(0, limit)), truncated: rows.length > limit };
 }
 
 export async function listTags(db: Database): Promise<string[]> {
@@ -349,12 +383,14 @@ export function buildMatchQuery(text: string): string | null {
     return tokens.map((token) => `"${token}"*`).join(' ');
 }
 
-export async function searchEntries(db: Database, text: string, limit = 50): Promise<SearchResult[]> {
+export async function searchEntries(db: Database, text: string, filter: ListFilter = { view: 'all' }): Promise<EntryResults<SearchResult>> {
     const match = buildMatchQuery(text);
     if (!match) {
-        return [];
+        return { rows: [], truncated: false };
     }
 
+    const { where, params } = filterEntries(filter);
+    const limit = 50;
     const rows = await all(
         db,
         `WITH hits AS (
@@ -363,15 +399,15 @@ export async function searchEntries(db: Database, text: string, limit = 50): Pro
          )
          SELECT e.*, hits.rank AS rank FROM hits
          JOIN entries e ON e.rowid = hits.rid
-         WHERE e.is_archived = 0
+         WHERE ${where.join(' AND ')}
          ORDER BY hits.rank LIMIT ?`,
-        [match, limit],
+        [match, ...params, limit + 1],
     );
 
-    const entries = await hydrate(db, rows);
-    return entries.map((entry, index) => ({
+    const entries = await hydrate(db, rows.slice(0, limit));
+    return { rows: entries.map((entry, index) => ({
         entry,
         preview: entry.content.replace(/\s+/g, ' ').slice(0, 140),
         rank: Number(rows[index].rank),
-    }));
+    })), truncated: rows.length > limit };
 }

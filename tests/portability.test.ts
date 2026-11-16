@@ -1,7 +1,7 @@
 import type sqlite3 from 'sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 import { openTestDatabase } from './testDatabase.js';
-import { createEntry, getEntryById, listEntries, listTags, searchEntries, updateEntry } from '../src/database/entryRepository.js';
+import { all, createEntry, getEntryById, listEntries, listTags, searchEntries, updateEntry } from '../src/database/entryRepository.js';
 import { applyImport, buildLibraryFile, previewImport } from '../src/database/portability.js';
 import { LibraryFileSchema, type LibraryFile } from '../src/shared/portability.js';
 
@@ -60,7 +60,7 @@ describe('library export and import', () => {
         const copy = await getEntryById(target, a.id);
         expect(copy).toMatchObject({ title: a.title, content: a.content, created_at: a.created_at, updated_at: a.updated_at, is_template: true });
         expect([...copy.tags].sort()).toEqual(['Support', 'billing']);
-        expect((await searchEntries(target, 'refund')).map((hit) => hit.entry.id)).toEqual([a.id]);
+        expect((await searchEntries(target, 'refund')).rows.map((hit) => hit.entry.id)).toEqual([a.id]);
         expect(await listTags(target)).toEqual(['billing', 'Support']);
     });
 
@@ -95,7 +95,7 @@ describe('library export and import', () => {
 
         expect(second).toMatchObject({ added: 0, updated: 0, skipped: 2 });
         expect((await previewImport(target, file, 'lib.velto')).identical).toBe(2);
-        expect(await listEntries(target, { view: 'all' })).toHaveLength(1);
+        expect((await listEntries(target, { view: 'all' })).rows).toHaveLength(1);
     });
 
     it('merge updates entries that are older locally and keeps entries that are newer locally', async () => {
@@ -117,7 +117,20 @@ describe('library export and import', () => {
         expect(result).toMatchObject({ added: 0, updated: 1, skipped: 1 });
         expect((await getEntryById(target, a.id)).title).toBe('Refund processed v2');
         expect((await getEntryById(target, b.id)).title).toBe('Meeting move (local edit)');
-        expect(await searchEntries(target, 'v2')).toHaveLength(1);
+        expect((await searchEntries(target, 'v2')).rows).toHaveLength(1);
+    });
+
+    it('removes orphaned tags when a merge overwrites an entry', async () => {
+        const db = await createDatabase();
+        const entry = await createEntry(db, { title: 'Original', content: 'body', tags: ['old', 'shared'] });
+        await createEntry(db, { title: 'Other', content: 'body', tags: ['shared'], is_archived: true });
+        const file = roundTrip(await buildLibraryFile(db));
+        file.entries = file.entries.filter((item) => item.id === entry.id).map((item) => ({
+            ...item, title: 'Updated', tags: ['new'], updated_at: '2100-01-01T00:00:00.000Z',
+        }));
+        expect((await applyImport(db, file, 'merge')).updated).toBe(1);
+        expect((await all(db, 'SELECT name FROM tags ORDER BY name')).map((row) => row.name)).toEqual(['new', 'shared']);
+        expect((await getEntryById(db, entry.id)).tags).toEqual(['new']);
     });
 
     it('duplicate mode adds copies with new ids', async () => {
@@ -142,7 +155,7 @@ describe('library export and import', () => {
 
         const exported = await buildLibraryFile(target);
         expect(exported.entries.map((entry) => entry.title).sort()).toEqual(['Meeting move', 'Refund processed']);
-        expect(await searchEntries(target, 'zebra')).toHaveLength(0);
+        expect((await searchEntries(target, 'zebra')).rows).toHaveLength(0);
         expect(await listTags(target)).not.toContain('stripes');
     });
 
@@ -194,7 +207,7 @@ describe('library file validation', () => {
 
     it.each([
         ['wrong format', { ...base, format: 'other' }],
-        ['newer version', { ...base, version: 5 }],
+        ['newer version', { ...base, version: 6 }],
         ['missing entries', { format: base.format, version: 1, exported_at: base.exported_at }],
         ['bad timestamp', { ...base, exported_at: 'yesterday' }],
         ['empty title', { ...base, entries: [{ id: '1', title: '  ', content: '', created_at: base.exported_at, updated_at: base.exported_at }] }],

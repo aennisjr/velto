@@ -28,6 +28,8 @@ Open **Variable settings** to customize each placeholder's label and default val
 
 Save the entry, then choose **Use Template** from the entry or select it in Quick Search. Fill in the fields and review the preview before copying. The saved template stays unchanged. To copy its placeholders literally, use **Copy raw** from the entry.
 
+To save related text such as an email subject, choose **Add field** below the content and enter a name and value. Each field can be copied separately. Fields support the same placeholders as the main content, and a shared placeholder needs to be filled in only once. Additional fields are included in search, duplication, backups, and exports.
+
 ### View code snippets
 
 Open an entry and use the **Syntax highlighting** menu below its content to choose a language. The choice is saved with that entry; new and existing entries default to **Plain text**. Highlighting changes only how content is displayed—editing and copying continue to use the original text.
@@ -35,6 +37,10 @@ Open an entry and use the **Syntax highlighting** menu below its content to choo
 ### Organize and manage your library
 
 Use the library to search and browse entries, create or edit saved text, and mark useful entries as favorites. Add tags and categories while editing an entry; select a category or tag in the sidebar to filter the list. Choose **Select** above the entry list to select multiple entries, then choose **Delete selected** and confirm to remove them together. Use **Settings** to manage categories and tags, configure global shortcuts, and control automatic backups.
+
+Tags are deleted automatically when no entries use them. Archived entries retain their tags and are included in the tag usage counts in Settings.
+
+Search stays within the selected view, tag, or category. The library displays at most 5,000 entries or 50 search matches; Quick Search displays at most 12 entries before typing or 50 matches. When results are cut off, refine the search to find other entries.
 
 ### Back up or move your library
 

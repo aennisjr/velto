@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,11 +15,11 @@ const args = ['.', `--user-data-dir=${userData}`];
 let app;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function waitForLibrary() {
+async function waitForLibrary(expectedText = 'Create your first entry') {
     for (let attempt = 0; attempt < 100; attempt++) {
         const page = app.windows().find((window) => window.url().includes('index.html') && !/#\/(quick|capture)/.test(window.url()));
         if (page) {
-            await page.getByText('Create your first entry').waitFor();
+            await page.getByText(expectedText).first().waitFor();
             return page;
         }
         await sleep(100);
@@ -33,7 +33,11 @@ function readUserVersion(file) {
             if (openError) return reject(openError);
             db.get('PRAGMA user_version', (error, row) => {
                 db.close();
-                error ? reject(error) : resolve(row.user_version);
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve(row.user_version);
+                }
             });
         });
     });
@@ -46,7 +50,7 @@ try {
     await app.firstWindow();
     await waitForLibrary();
 
-    assert.equal(await readUserVersion(join(userData, 'velto.db')), 3, 'database is at schema version 3');
+    assert.equal(await readUserVersion(join(userData, 'velto.db')), 5, 'database is at schema version 5');
 
     // Closing the window hides it to the tray instead of quitting
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => !/#\/(quick|capture)/.test(w.webContents.getURL())).close());
@@ -60,17 +64,21 @@ try {
     await app.evaluate(async () => new Promise((resolve) => setTimeout(resolve, 500)));
     assert.deepEqual(await windows(), [{ visible: true, destroyed: false }], 'second launch shows the existing window');
 
-    // Quit actually exits, even though close hides the window
+    // Quit closes the database and checkpoints the WAL before exiting.
+    const library = await waitForLibrary();
+    await library.evaluate(() => window.velto.createEntry({ title: 'Persisted on quit', content: 'checkpoint' }));
+    assert.equal(existsSync(join(userData, 'velto.db-wal')), true, 'WAL exists before quit');
     const exited = new Promise((resolve) => app.process().once('exit', resolve));
     await app.evaluate(({ app: electronApp }) => electronApp.quit());
     await exited;
     app = undefined;
+    assert.equal(existsSync(join(userData, 'velto.db-wal')), false, 'WAL removed after clean shutdown');
 
     // Reopening against the same data keeps the schema version
     app = await electron.launch({ args });
     await app.firstWindow();
-    await waitForLibrary();
-    assert.equal(await readUserVersion(join(userData, 'velto.db')), 3);
+    await waitForLibrary('Persisted on quit');
+    assert.equal(await readUserVersion(join(userData, 'velto.db')), 5);
     await app.close();
     app = undefined;
     console.log('SHELL E2E PASSED');

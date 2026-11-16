@@ -69,8 +69,8 @@ try {
     await library.locator('.item', { hasText: 'Thanks for reaching out!' }).waitFor();
 
     const entries = await library.evaluate(() => window.velto.listEntries({ view: 'all' }));
-    assert.equal(entries.length, 2);
-    const capturedEntry = entries.find((entry) => entry.title === 'Thanks for reaching out!');
+    assert.equal(entries.rows.length, 2);
+    const capturedEntry = entries.rows.find((entry) => entry.title === 'Thanks for reaching out!');
     assert.ok(capturedEntry, 'captured entry was saved');
     assert.deepEqual([...capturedEntry.tags].sort(), ['greeting', 'quick']);
     assert.equal(capturedEntry.is_favorite, true);
@@ -93,11 +93,12 @@ try {
     assert.equal(await capture.getByLabel('Content').inputValue(), '');
     await capture.getByRole('button', { name: /^Save/ }).click();
     await capture.getByRole('alert').waitFor();
-    assert.equal((await library.evaluate(() => window.velto.listEntries({ view: 'all' }))).length, 2);
+    assert.equal((await library.evaluate(() => window.velto.listEntries({ view: 'all' }))).rows.length, 2);
 
     // Clipboard paste and Escape (the text survives so nothing typed is lost)
     await app.evaluate(({ clipboard }) => clipboard.writeText('From the clipboard'));
     await capture.getByRole('button', { name: 'Paste clipboard' }).click();
+    await capture.waitForFunction(() => document.querySelector('[aria-label="Content"]')?.value === 'From the clipboard');
     assert.equal(await capture.getByLabel('Content').inputValue(), 'From the clipboard');
     await capture.keyboard.press('Escape');
     await sleep(300);

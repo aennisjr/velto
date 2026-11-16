@@ -1,7 +1,7 @@
 import type sqlite3 from 'sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 import { openTestDatabase } from './testDatabase.js';
-import { createEntry, getEntryById, listEntries, searchEntries, updateEntry } from '../src/database/entryRepository.js';
+import { all, createEntry, deleteEntries, deleteEntry, getEntryById, listEntries, run, searchEntries, setArchived, updateEntry } from '../src/database/entryRepository.js';
 import {
     createCategory,
     deleteCategory,
@@ -28,7 +28,7 @@ afterEach(() => {
     }
 });
 
-const ids = async (db: sqlite3.Database, query: string) => (await searchEntries(db, query)).map((hit) => hit.entry.id);
+const ids = async (db: sqlite3.Database, query: string) => (await searchEntries(db, query)).rows.map((hit) => hit.entry.id);
 
 describe('categories', () => {
     it('creates, lists with counts, and rejects duplicates and blanks', async () => {
@@ -49,7 +49,7 @@ describe('categories', () => {
         const inSales = await createEntry(db, { title: 'Pitch', content: 'x', category_id: sales.id });
         await createEntry(db, { title: 'Other', content: 'y' });
 
-        expect((await listEntries(db, { view: 'all', category_id: sales.id })).map((e) => e.id)).toEqual([inSales.id]);
+        expect((await listEntries(db, { view: 'all', category_id: sales.id })).rows.map((e) => e.id)).toEqual([inSales.id]);
     });
 
     it('makes entries searchable by category name, and rename updates search', async () => {
@@ -95,6 +95,8 @@ describe('categories', () => {
 });
 
 describe('tag management', () => {
+    const storedTags = async (db: sqlite3.Database) => (await all(db, 'SELECT name FROM tags ORDER BY name')).map((row) => row.name);
+
     it('reports usage counts', async () => {
         const db = await createDatabase();
         await createEntry(db, { title: 'A', content: 'a', tags: ['x', 'y'] });
@@ -103,6 +105,56 @@ describe('tag management', () => {
             { name: 'x', count: 2 },
             { name: 'y', count: 1 },
         ]);
+    });
+
+    it('cleans up removed tags but keeps shared and unchanged tags', async () => {
+        const db = await createDatabase();
+        const first = await createEntry(db, { title: 'First', content: 'body', tags: ['removed', 'shared', 'Keep'] });
+        const second = await createEntry(db, { title: 'Second', content: 'body', tags: ['shared'] });
+        await updateEntry(db, { ...first, tags: ['shared', 'keep'] });
+        expect(await storedTags(db)).toEqual(['Keep', 'shared']);
+        expect((await getEntryById(db, first.id)).tags).toEqual(['Keep', 'shared']);
+        await updateEntry(db, { ...second, tags: [] });
+        expect(await storedTags(db)).toEqual(['Keep', 'shared']);
+        await updateEntry(db, { ...first, tags: [] });
+        expect(await storedTags(db)).toEqual([]);
+    });
+
+    it('removes tags after individual and bulk deletion, retaining tags used by surviving entries', async () => {
+        const db = await createDatabase();
+        const first = await createEntry(db, { title: 'First', content: 'body', tags: ['only-first', 'shared'] });
+        const second = await createEntry(db, { title: 'Second', content: 'body', tags: ['bulk', 'shared'] });
+        const third = await createEntry(db, { title: 'Third', content: 'body', tags: ['bulk'] });
+        const keep = await createEntry(db, { title: 'Keep', content: 'body', tags: ['shared'], is_archived: true });
+
+        await deleteEntry(db, first.id);
+        expect(await storedTags(db)).toEqual(['bulk', 'shared']);
+        await deleteEntries(db, [second.id, third.id]);
+        expect(await storedTags(db)).toEqual(['shared']);
+        expect(await listTagUsage(db)).toEqual([{ name: 'shared', count: 1 }]);
+        expect((await getEntryById(db, keep.id)).tags).toEqual(['shared']);
+        await deleteEntry(db, keep.id);
+        expect(await storedTags(db)).toEqual([]);
+    });
+
+    it('counts archived entries and preserves their tags through archive and restore', async () => {
+        const db = await createDatabase();
+        const entry = await createEntry(db, { title: 'Archived', content: 'body', tags: ['archive'] });
+        await setArchived(db, entry.id, true);
+        expect(await listTagUsage(db)).toEqual([{ name: 'archive', count: 1 }]);
+        expect(await storedTags(db)).toEqual(['archive']);
+        await setArchived(db, entry.id, false);
+        expect((await getEntryById(db, entry.id)).tags).toEqual(['archive']);
+    });
+
+    it('rolls back the entry update if tag cleanup fails', async () => {
+        const db = await createDatabase();
+        const entry = await createEntry(db, { title: 'Original', content: 'body', tags: ['keep'] });
+        await run(db, "CREATE TRIGGER reject_tag_delete BEFORE DELETE ON tags BEGIN SELECT RAISE(ABORT, 'tag cleanup failed'); END");
+        await expect(updateEntry(db, { ...entry, title: 'Changed', tags: [] })).rejects.toThrow('tag cleanup failed');
+        expect((await getEntryById(db, entry.id)).title).toBe('Original');
+        expect((await getEntryById(db, entry.id)).tags).toEqual(['keep']);
+        expect(await storedTags(db)).toEqual(['keep']);
     });
 
     it('renames a tag and updates search', async () => {
@@ -152,7 +204,7 @@ describe('categories in export and import', () => {
     it('exports category names, including empty categories', async () => {
         const { db, entry } = await source();
         const file = await buildLibraryFile(db);
-        expect(file.version).toBe(4);
+        expect(file.version).toBe(5);
         expect(file.categories).toEqual(['Empty', 'Sales']);
         expect(file.entries.find((e) => e.id === entry.id)?.category).toBe('Sales');
     });

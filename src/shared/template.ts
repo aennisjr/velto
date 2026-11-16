@@ -5,7 +5,7 @@
  * is left untouched. Substitution is single-pass, so values are never re-scanned
  * and a value containing "%other%" stays literal text.
  */
-import type { TemplateVariable } from './types.js';
+import type { EntryField, TemplateVariable } from './types.js';
 
 const PLACEHOLDER = /%([A-Za-z_][A-Za-z0-9_]{0,63})%/g;
 
@@ -22,6 +22,10 @@ export interface RenderResult {
 export function parseTemplateVariables(content: string): ParsedTemplateVariables {
     const names = [...content.matchAll(PLACEHOLDER)].map((match) => match[1]);
     return { names, uniqueNames: [...new Set(names)] };
+}
+
+export function entryVariableNames(content: string, fields: readonly EntryField[]): string[] {
+    return [...new Set([content, ...fields.map((field) => field.value)].flatMap((text) => parseTemplateVariables(text).names))];
 }
 
 /**

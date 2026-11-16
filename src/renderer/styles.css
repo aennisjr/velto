@@ -22,6 +22,57 @@
     --shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
+.results-limit {
+    margin: 0;
+    padding: 8px 12px;
+    font-size: 12px;
+}
+
+.additional-fields,
+.additional-field,
+.additional-field-preview {
+    display: grid;
+    gap: 8px;
+}
+
+.additional-fields {
+    margin: 12px 0;
+}
+
+.additional-field {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+}
+
+.additional-fields .btn {
+    justify-self: start;
+}
+
+.additional-field-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+}
+
+.additional-field-content .preview {
+    flex: 1;
+    min-width: 0;
+}
+
+.additional-field-content .btn {
+    flex: none;
+}
+
+.additional-field-preview {
+    margin: 16px 0;
+}
+
+.additional-field-preview h3 {
+    margin: 0;
+}
+
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme]) {
         --bg: #1c1c1e;

@@ -36,14 +36,14 @@ try {
 
     page.once('dialog', (dialog) => dialog.dismiss());
     await page.getByRole('button', { name: 'Delete selected' }).click();
-    assert.equal((await page.evaluate(() => window.velto.listEntries({ view: 'all' }))).length, 3, 'cancel leaves entries unchanged');
+    assert.equal((await page.evaluate(() => window.velto.listEntries({ view: 'all' }))).rows.length, 3, 'cancel leaves entries unchanged');
 
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Delete selected' }).click();
     await page.getByText('Deleted 2 entries', { exact: true }).waitFor();
     const entries = await page.evaluate(() => window.velto.listEntries({ view: 'all' }));
-    assert.deepEqual(entries.map((entry) => entry.title), ['Keep gamma']);
-    assert.equal((await page.evaluate(() => window.velto.searchEntries('bulk delete'))).length, 0, 'deleted entries leave full-text search');
+    assert.deepEqual(entries.rows.map((entry) => entry.title), ['Keep gamma']);
+    assert.equal((await page.evaluate(() => window.velto.searchEntries('bulk delete'))).rows.length, 0, 'deleted entries leave full-text search');
 
     console.log('BULK DELETE E2E PASSED');
 } finally {

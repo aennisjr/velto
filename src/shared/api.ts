@@ -1,4 +1,5 @@
-import type { Category, CategorySummary, LibraryEntry, ListFilter, SearchResult, TagSummary } from './types.js';
+import type { Category, CategorySummary, EntryResults, LibraryEntry, ListFilter, SearchResult, TagSummary } from './types.js';
+import type { SyntaxLanguage } from './syntaxLanguages.js';
 import type { ExportResult, ImportMode, ImportPreview, ImportResult } from './portability.js';
 import type { BackupInfo, SettingsPatch, SettingsState } from './settings.js';
 import type { LibraryEntryDraft } from './validators.js';
@@ -23,8 +24,8 @@ export interface VeltoApi {
     cancelImport(): Promise<void>;
     appVersion(): Promise<string>;
     databaseStatus(): Promise<{ ready: boolean; path: string | null }>;
-    listEntries(filter: ListFilter): Promise<LibraryEntry[]>;
-    searchEntries(query: string): Promise<SearchResult[]>;
+    listEntries(filter: ListFilter): Promise<EntryResults<LibraryEntry>>;
+    searchEntries(query: string, filter?: ListFilter): Promise<EntryResults<SearchResult>>;
     listTags(): Promise<string[]>;
     listCategories(): Promise<CategorySummary[]>;
     createCategory(name: string): Promise<Category>;
@@ -39,5 +40,7 @@ export interface VeltoApi {
     deleteEntries(ids: string[]): Promise<void>;
     duplicateEntry(id: string): Promise<LibraryEntry>;
     toggleFavorite(id: string): Promise<LibraryEntry>;
+    setArchived(id: string, value: boolean): Promise<LibraryEntry>;
+    setSyntaxLanguage(id: string, language: SyntaxLanguage): Promise<LibraryEntry>;
     copyText(payload: { text: string; entryId?: string }): Promise<void>;
 }

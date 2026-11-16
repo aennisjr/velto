@@ -12,10 +12,16 @@ export interface Tag {
     created_at: string;
 }
 
+export interface EntryField {
+    label: string;
+    value: string;
+}
+
 export interface LibraryEntry {
     id: string;
     title: string;
     content: string;
+    fields: EntryField[];
     syntax_language: SyntaxLanguage;
     description?: string;
     category_id?: string;
@@ -45,6 +51,11 @@ export interface SearchResult {
     entry: LibraryEntry;
     preview: string;
     rank: number;
+}
+
+export interface EntryResults<T> {
+    rows: T[];
+    truncated: boolean;
 }
 
 export type LibraryView = 'all' | 'favorites' | 'recent' | 'archived';

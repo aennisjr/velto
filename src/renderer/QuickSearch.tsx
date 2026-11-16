@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, Search, Sparkles, Star } from 'lucide-react';
 import type { LibraryEntry } from '../shared/types.js';
-import { parseTemplateVariables } from '../shared/template.js';
+import { entryVariableNames } from '../shared/template.js';
 import TemplateUse from './TemplateUse.js';
 import { initTheme } from './ThemeMenu.js';
 
@@ -17,12 +17,13 @@ function snippet(content: string): string {
 }
 
 function needsForm(entry: LibraryEntry): boolean {
-    return entry.is_template && parseTemplateVariables(entry.content).uniqueNames.length > 0;
+    return entry.is_template && (entry.fields.length > 0 || entryVariableNames(entry.content, entry.fields).length > 0);
 }
 
 export default function QuickSearch() {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Result[]>([]);
+    const [truncated, setTruncated] = useState(false);
     const [selected, setSelected] = useState(0);
     const [template, setTemplate] = useState<LibraryEntry | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -35,14 +36,19 @@ export default function QuickSearch() {
         const id = ++requestId.current;
         try {
             let next: Result[];
+            let nextTruncated: boolean;
             if (text.trim()) {
-                next = (await window.velto.searchEntries(text.trim())).map((hit) => ({ entry: hit.entry, preview: hit.preview }));
+                const result = await window.velto.searchEntries(text.trim());
+                next = result.rows.map((hit) => ({ entry: hit.entry, preview: hit.preview }));
+                nextTruncated = result.truncated;
             } else {
-                const entries = await window.velto.listEntries({ view: 'all' });
-                next = entries.slice(0, EMPTY_QUERY_LIMIT).map((entry) => ({ entry, preview: snippet(entry.content) }));
+                const result = await window.velto.listEntries({ view: 'all' });
+                next = result.rows.slice(0, EMPTY_QUERY_LIMIT).map((entry) => ({ entry, preview: snippet(entry.content) }));
+                nextTruncated = result.truncated || result.rows.length > EMPTY_QUERY_LIMIT;
             }
             if (id === requestId.current) {
                 setResults(next);
+                setTruncated(nextTruncated);
                 setSelected(0);
                 setLoaded(true);
                 setError(null);
@@ -179,6 +185,8 @@ export default function QuickSearch() {
                     </li>
                 ))}
             </ul>
+
+            {truncated && <p className="muted quick-message" role="status">Showing first {results.length.toLocaleString()} results, refine your search.</p>}
 
             {loaded && results.length === 0 && !error && (
                 <p className="muted quick-message">{query.trim() ? `No matches for “${query.trim()}”.` : 'Your library is empty. Open Velto to add entries.'}</p>

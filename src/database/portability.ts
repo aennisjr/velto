@@ -10,6 +10,7 @@ import {
     type LibraryFile,
 } from '../shared/portability.js';
 import { all, get, loadVariables, reindex, run, setTags, setVariables, transaction } from './entryRepository.js';
+import { EntryFieldsSchema } from '../shared/validators.js';
 
 function tagKey(tags: string[]): string {
     return tags.map((tag) => tag.toLowerCase()).sort().join('\u0000');
@@ -23,6 +24,7 @@ function sameContent(a: ExportedEntry, b: ExportedEntry): boolean {
     return (
         a.title === b.title &&
         a.content === b.content &&
+        JSON.stringify(a.fields) === JSON.stringify(b.fields) &&
         a.syntax_language === b.syntax_language &&
         (a.description ?? '') === (b.description ?? '') &&
         (a.category ?? '').toLowerCase() === (b.category ?? '').toLowerCase() &&
@@ -54,6 +56,7 @@ async function loadAll(db: Database): Promise<ExportedEntry[]> {
         id: String(row.id),
         title: String(row.title),
         content: String(row.content),
+        fields: EntryFieldsSchema.parse(JSON.parse(String(row.fields))),
         syntax_language: String(row.syntax_language ?? 'plaintext') as ExportedEntry['syntax_language'],
         description: row.description == null || row.description === '' ? undefined : String(row.description),
         category: row.category_name == null ? undefined : String(row.category_name),
@@ -147,25 +150,25 @@ function categoryResolver(db: Database): CategoryResolver {
 async function insertEntry(db: Database, entry: ExportedEntry, id: string, resolve: CategoryResolver): Promise<void> {
     await run(
         db,
-        `INSERT INTO entries (id, title, content, syntax_language, description, category_id, is_favorite, is_template, is_archived, created_at, updated_at, last_used_at, use_count)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, entry.title, entry.content, entry.syntax_language, entry.description ?? null, await resolve(entry.category), Number(entry.is_favorite), Number(entry.is_template), Number(entry.is_archived), entry.created_at, entry.updated_at, entry.last_used_at ?? null, entry.use_count],
+        `INSERT INTO entries (id, title, content, fields, syntax_language, description, category_id, is_favorite, is_template, is_archived, created_at, updated_at, last_used_at, use_count)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, entry.title, entry.content, JSON.stringify(entry.fields), entry.syntax_language, entry.description ?? null, await resolve(entry.category), Number(entry.is_favorite), Number(entry.is_template), Number(entry.is_archived), entry.created_at, entry.updated_at, entry.last_used_at ?? null, entry.use_count],
     );
     await setTags(db, id, entry.tags);
-    await setVariables(db, id, entry.content, entry.variables);
+    await setVariables(db, id, entry.content, entry.fields, entry.variables);
     await reindex(db, id);
 }
 
 async function overwriteEntry(db: Database, entry: ExportedEntry, resolve: CategoryResolver): Promise<void> {
     await run(
         db,
-        `UPDATE entries SET title = ?, content = ?, syntax_language = ?, description = ?, category_id = ?, is_favorite = ?, is_template = ?, is_archived = ?,
+        `UPDATE entries SET title = ?, content = ?, fields = ?, syntax_language = ?, description = ?, category_id = ?, is_favorite = ?, is_template = ?, is_archived = ?,
          created_at = ?, updated_at = ?, last_used_at = COALESCE(?, last_used_at), use_count = MAX(use_count, ?)
          WHERE id = ?`,
-        [entry.title, entry.content, entry.syntax_language, entry.description ?? null, await resolve(entry.category), Number(entry.is_favorite), Number(entry.is_template), Number(entry.is_archived), entry.created_at, entry.updated_at, entry.last_used_at ?? null, entry.use_count, entry.id],
+        [entry.title, entry.content, JSON.stringify(entry.fields), entry.syntax_language, entry.description ?? null, await resolve(entry.category), Number(entry.is_favorite), Number(entry.is_template), Number(entry.is_archived), entry.created_at, entry.updated_at, entry.last_used_at ?? null, entry.use_count, entry.id],
     );
     await setTags(db, entry.id, entry.tags);
-    await setVariables(db, entry.id, entry.content, entry.variables);
+    await setVariables(db, entry.id, entry.content, entry.fields, entry.variables);
     await reindex(db, entry.id);
 }
 

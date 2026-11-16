@@ -28,6 +28,8 @@ import {
     RenameCategorySchema,
     RenameTagSchema,
     SearchQuerySchema,
+    SetArchivedSchema,
+    SetSyntaxLanguageSchema,
 } from '../shared/validators.js';
 
 const FILE_FILTERS = [{ name: 'Velto library', extensions: ['velto', 'json'] }];
@@ -136,7 +138,8 @@ export function registerIpc(db: Database, dbPath: string): void {
     });
 
     ipcMain.handle('entries:list', (_event, filter: unknown) => repo.listEntries(db, ListFilterSchema.parse(filter)));
-    ipcMain.handle('entries:search', (_event, query: unknown) => repo.searchEntries(db, SearchQuerySchema.parse(query)));
+    ipcMain.handle('entries:search', (_event, query: unknown, filter: unknown) =>
+        repo.searchEntries(db, SearchQuerySchema.parse(query), filter === undefined ? undefined : ListFilterSchema.parse(filter)));
     ipcMain.handle('entries:tags', () => repo.listTags(db));
     ipcMain.handle('categories:list', () => organizer.listCategories(db));
     ipcMain.handle('categories:create', (_event, name: unknown) => organizer.createCategory(db, NameSchema.parse(name)));
@@ -160,6 +163,14 @@ export function registerIpc(db: Database, dbPath: string): void {
     ipcMain.handle('entries:delete-many', (_event, ids: unknown) => repo.deleteEntries(db, EntryIdsSchema.parse(ids)));
     ipcMain.handle('entries:duplicate', (_event, id: unknown) => repo.duplicateEntry(db, EntryIdSchema.parse(id)));
     ipcMain.handle('entries:toggle-favorite', (_event, id: unknown) => repo.toggleFavorite(db, EntryIdSchema.parse(id)));
+    ipcMain.handle('entries:set-archived', (_event, payload: unknown) => {
+        const { id, value } = SetArchivedSchema.parse(payload);
+        return repo.setArchived(db, id, value);
+    });
+    ipcMain.handle('entries:set-syntax-language', (_event, payload: unknown) => {
+        const { id, language } = SetSyntaxLanguageSchema.parse(payload);
+        return repo.setSyntaxLanguage(db, id, language);
+    });
 
     ipcMain.handle('clipboard:copy', async (_event, payload: unknown) => {
         const { text, entryId } = CopyPayloadSchema.parse(payload);

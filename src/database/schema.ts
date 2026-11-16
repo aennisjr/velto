@@ -33,6 +33,14 @@ const VERSION_3_SQL = `
 ALTER TABLE entries ADD COLUMN syntax_language TEXT NOT NULL DEFAULT 'plaintext';
 `;
 
+const VERSION_4_SQL = `
+DELETE FROM tags WHERE NOT EXISTS (SELECT 1 FROM entry_tags WHERE tag_id = tags.id);
+`;
+
+const VERSION_5_SQL = `
+ALTER TABLE entries ADD COLUMN fields TEXT NOT NULL DEFAULT '[]';
+`;
+
 // Version 1 is the original schema. It is idempotent, so libraries created before versioning upgrade cleanly.
 // Later schema changes are added here as new numbered migrations.
 export function loadMigrations(): Migration[] {
@@ -40,5 +48,7 @@ export function loadMigrations(): Migration[] {
         { version: 1, sql: fs.readFileSync(getSchemaPath(), 'utf8') },
         { version: 2, sql: VERSION_2_SQL },
         { version: 3, sql: VERSION_3_SQL },
+        { version: 4, sql: VERSION_4_SQL },
+        { version: 5, sql: VERSION_5_SQL },
     ];
 }

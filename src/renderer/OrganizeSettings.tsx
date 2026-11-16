@@ -156,7 +156,7 @@ export default function OrganizeSettings({ onChanged }: Props) {
             />
 
             <h3>Tags</h3>
-            <p className="muted">Renaming a tag to an existing name merges them.</p>
+            <p className="muted">Counts include archived entries. Unused tags are deleted automatically. Renaming a tag to an existing name merges them.</p>
             <ManageList
                 label="Tags"
                 icon={Tag}

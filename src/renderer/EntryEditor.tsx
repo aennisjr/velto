@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CategorySummary, LibraryEntry, VariableFieldType } from '../shared/types.js';
+import type { CategorySummary, EntryField, LibraryEntry, VariableFieldType } from '../shared/types.js';
 import type { LibraryEntryDraft } from '../shared/validators.js';
-import { parseTemplateVariables } from '../shared/template.js';
+import { entryVariableNames } from '../shared/template.js';
 
 interface Props {
     entry: LibraryEntry | null;
@@ -24,6 +24,7 @@ interface Draft {
     title: string;
     description: string;
     content: string;
+    fields?: EntryField[];
     tags: string;
     isTemplate: boolean;
     categoryId: string;
@@ -58,6 +59,7 @@ export default function EntryEditor({ entry, categories, defaultCategoryId, onSa
             title: entry?.title ?? '',
             description: entry?.description ?? '',
             content: entry?.content ?? '',
+            fields: entry?.fields ?? [],
             tags: (entry?.tags ?? []).join(', '),
             isTemplate: entry?.is_template ?? false,
             categoryId: entry ? (entry.category_id ?? '') : (defaultCategoryId ?? ''),
@@ -86,6 +88,7 @@ export default function EntryEditor({ entry, categories, defaultCategoryId, onSa
     const [title, setTitle] = useState(start.title);
     const [description, setDescription] = useState(start.description);
     const [content, setContent] = useState(start.content);
+    const [fields, setFields] = useState<EntryField[]>(start.fields ?? initial.fields);
     const [tagsText, setTagsText] = useState(start.tags);
     const [isTemplate, setIsTemplate] = useState(start.isTemplate);
     const [categoryId, setCategoryId] = useState(start.categoryId);
@@ -95,7 +98,7 @@ export default function EntryEditor({ entry, categories, defaultCategoryId, onSa
     const templateTouched = useRef(entry !== null || recovered !== null);
     const titleRef = useRef<HTMLInputElement>(null);
 
-    const variables = useMemo(() => parseTemplateVariables(content).uniqueNames, [content]);
+    const variables = useMemo(() => entryVariableNames(content, fields), [content, fields]);
     const formFor = (name: string): VariableForm => forms[name] ?? DEFAULT_FORM;
     const updateForm = (name: string, changes: Partial<VariableForm>): void =>
         setForms((current) => ({ ...current, [name]: { ...(current[name] ?? DEFAULT_FORM), ...changes } }));
@@ -106,6 +109,7 @@ export default function EntryEditor({ entry, categories, defaultCategoryId, onSa
         title !== initial.title ||
         description !== initial.description ||
         content !== initial.content ||
+        JSON.stringify(fields) !== JSON.stringify(initial.fields) ||
         tagsText !== initial.tags ||
         categoryId !== initial.categoryId ||
         isTemplate !== initial.isTemplate;
@@ -117,7 +121,7 @@ export default function EntryEditor({ entry, categories, defaultCategoryId, onSa
             return;
         }
         const timer = window.setTimeout(() => {
-            const draft: Draft = { title, description, content, tags: tagsText, isTemplate, categoryId, forms };
+            const draft: Draft = { title, description, content, fields, tags: tagsText, isTemplate, categoryId, forms };
             try {
                 localStorage.setItem(key, JSON.stringify(draft));
             } catch {
@@ -125,7 +129,7 @@ export default function EntryEditor({ entry, categories, defaultCategoryId, onSa
             }
         }, 400);
         return () => window.clearTimeout(timer);
-    }, [dirty, key, title, description, content, tagsText, isTemplate, categoryId, forms]);
+    }, [dirty, key, title, description, content, fields, tagsText, isTemplate, categoryId, forms]);
 
     useEffect(() => {
         onDirtyChange(dirty);
@@ -150,6 +154,10 @@ export default function EntryEditor({ entry, categories, defaultCategoryId, onSa
             setError('Add a title or some content first.');
             return;
         }
+        if (fields.some((field) => !field.label.trim())) {
+            setError('Add a name for each additional field.');
+            return;
+        }
 
         setSaving(true);
         setError(null);
@@ -158,6 +166,7 @@ export default function EntryEditor({ entry, categories, defaultCategoryId, onSa
                 title: finalTitle,
                 description: description.trim() || undefined,
                 content,
+                fields,
                 syntax_language: entry?.syntax_language ?? 'plaintext',
                 tags: tagsText.split(',').map((tag) => tag.trim()).filter(Boolean),
                 is_template: isTemplate,
@@ -213,6 +222,7 @@ export default function EntryEditor({ entry, categories, defaultCategoryId, onSa
                             setTitle(initial.title);
                             setDescription(initial.description);
                             setContent(initial.content);
+                            setFields(initial.fields);
                             setTagsText(initial.tags);
                             setIsTemplate(initial.isTemplate);
                             setCategoryId(initial.categoryId);
@@ -246,6 +256,36 @@ export default function EntryEditor({ entry, categories, defaultCategoryId, onSa
                 onChange={(event) => setContent(event.target.value)}
                 spellCheck
             />
+            <section className="additional-fields" aria-label="Additional fields">
+                {fields.map((field, index) => (
+                    <fieldset className="additional-field" key={index}>
+                        <legend>Additional field {index + 1}</legend>
+                        <input
+                            className="field"
+                            aria-label={`Field ${index + 1} name`}
+                            placeholder="Field name (e.g. Subject)"
+                            value={field.label}
+                            maxLength={120}
+                            onChange={(event) => setFields((current) => current.map((item, i) => i === index ? { ...item, label: event.target.value } : item))}
+                        />
+                        <textarea
+                            className="field"
+                            aria-label={`Field ${index + 1} value`}
+                            placeholder="Field value"
+                            value={field.value}
+                            maxLength={10000}
+                            rows={2}
+                            onChange={(event) => setFields((current) => current.map((item, i) => i === index ? { ...item, value: event.target.value } : item))}
+                        />
+                        <button type="button" className="btn" onClick={() => setFields((current) => current.filter((_, i) => i !== index))}>
+                            Remove field
+                        </button>
+                    </fieldset>
+                ))}
+                <button type="button" className="btn" disabled={fields.length >= 20} onClick={() => setFields((current) => [...current, { label: '', value: '' }])}>
+                    Add field
+                </button>
+            </section>
             <div className="variable-row">
                 {variables.length > 0 ? (
                     <>

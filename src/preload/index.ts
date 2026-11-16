@@ -30,7 +30,7 @@ const api: VeltoApi = {
     appVersion: () => ipcRenderer.invoke('app:get-version'),
     databaseStatus: () => ipcRenderer.invoke('database:status'),
     listEntries: (filter) => ipcRenderer.invoke('entries:list', filter),
-    searchEntries: (query) => ipcRenderer.invoke('entries:search', query),
+    searchEntries: (query, filter) => ipcRenderer.invoke('entries:search', query, filter),
     listTags: () => ipcRenderer.invoke('entries:tags'),
     listCategories: () => ipcRenderer.invoke('categories:list'),
     createCategory: (name) => ipcRenderer.invoke('categories:create', name),
@@ -45,6 +45,8 @@ const api: VeltoApi = {
     deleteEntries: (ids) => ipcRenderer.invoke('entries:delete-many', ids),
     duplicateEntry: (id) => ipcRenderer.invoke('entries:duplicate', id),
     toggleFavorite: (id) => ipcRenderer.invoke('entries:toggle-favorite', id),
+    setArchived: (id, value) => ipcRenderer.invoke('entries:set-archived', { id, value }),
+    setSyntaxLanguage: (id, language) => ipcRenderer.invoke('entries:set-syntax-language', { id, language }),
     copyText: (payload) => ipcRenderer.invoke('clipboard:copy', payload),
 };
 

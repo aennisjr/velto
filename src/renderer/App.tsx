@@ -27,22 +27,6 @@ function snippet(content: string): string {
     return content.replace(/\s+/g, ' ').slice(0, 140);
 }
 
-function toDraft(entry: LibraryEntry, changes: Partial<LibraryEntryDraft> = {}): LibraryEntryDraft & { id: string } {
-    return {
-        id: entry.id,
-        title: entry.title,
-        content: entry.content,
-        syntax_language: entry.syntax_language,
-        description: entry.description,
-        category_id: entry.category_id,
-        tags: entry.tags,
-        is_favorite: entry.is_favorite,
-        is_template: entry.is_template,
-        is_archived: entry.is_archived,
-        ...changes,
-    };
-}
-
 export default function App() {
     const [view, setView] = useState<LibraryView>('all');
     const [tag, setTag] = useState<string | undefined>();
@@ -50,6 +34,7 @@ export default function App() {
     const [categories, setCategories] = useState<CategorySummary[]>([]);
     const [query, setQuery] = useState('');
     const [items, setItems] = useState<ListItem[]>([]);
+    const [truncated, setTruncated] = useState(false);
     const [loaded, setLoaded] = useState(false);
     const [tags, setTags] = useState<string[]>([]);
     const [detail, setDetail] = useState<LibraryEntry | null>(null);
@@ -78,16 +63,23 @@ export default function App() {
         try {
             const text = query.trim();
             let next: ListItem[];
+            let nextTruncated: boolean;
+            const filter = { view, tag, category_id: categoryId };
             if (text) {
-                next = (await window.velto.searchEntries(text)).map((hit) => ({ entry: hit.entry, preview: hit.preview }));
+                const result = await window.velto.searchEntries(text, filter);
+                next = result.rows.map((hit) => ({ entry: hit.entry, preview: hit.preview }));
+                nextTruncated = result.truncated;
             } else {
-                next = (await window.velto.listEntries({ view, tag, category_id: categoryId })).map((entry) => ({ entry, preview: snippet(entry.content) }));
+                const result = await window.velto.listEntries(filter);
+                next = result.rows.map((entry) => ({ entry, preview: snippet(entry.content) }));
+                nextTruncated = result.truncated;
             }
             const [nextTags, nextCategories] = await Promise.all([window.velto.listTags(), window.velto.listCategories()]);
             if (id !== requestId.current) {
                 return;
             }
             setItems(next);
+            setTruncated(nextTruncated);
             setTags(nextTags);
             setCategories(nextCategories);
             setLoaded(true);
@@ -228,7 +220,7 @@ export default function App() {
         const entryId = detail.id;
         setSavingLanguage(true);
         try {
-            const updated = await window.velto.updateEntry(toDraft(detail, { syntax_language: language }));
+            const updated = await window.velto.setSyntaxLanguage(entryId, language);
             setDetail((current) => current?.id === entryId ? updated : current);
             setError(null);
             await refresh();
@@ -258,7 +250,7 @@ export default function App() {
 
     const toggleArchive = (entry: LibraryEntry) =>
         runAction(async () => {
-            setDetail(await window.velto.updateEntry(toDraft(entry, { is_archived: !entry.is_archived })));
+            setDetail(await window.velto.setArchived(entry.id, !entry.is_archived));
             showToast(entry.is_archived ? 'Restored' : 'Archived');
             await refresh();
         });
@@ -403,7 +395,7 @@ export default function App() {
                         <Search size={15} />
                         <input
                             ref={searchRef}
-                            placeholder="Search everything…  (Ctrl+F)"
+                            placeholder="Search entries…  (Ctrl+F)"
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             onKeyDown={onSearchKey}
@@ -452,6 +444,7 @@ export default function App() {
                         </li>
                     ))}
                 </ul>
+                {truncated && <p className="muted results-limit" role="status">Showing first {items.length.toLocaleString()} results, refine your search.</p>}
                 {loaded && items.length === 0 && (
                     <div className="empty small">
                         {searching ? (
@@ -537,6 +530,17 @@ export default function App() {
                             )}
                         </div>
                         <SyntaxContent content={detail.content} isTemplate={detail.is_template} language={detail.syntax_language} />
+                        {detail.fields.map((field, index) => (
+                            <section className="additional-field-preview" key={index} aria-label={field.label}>
+                                <h3>{field.label}</h3>
+                                <div className="additional-field-content">
+                                    <pre className="preview">{field.value}</pre>
+                                    <button type="button" className="btn" aria-label={`Copy ${field.label}${detail.is_template ? ' raw' : ''}`} onClick={() => void copyText(field.value, detail)}>
+                                        <Copy size={15} /> Copy
+                                    </button>
+                                </div>
+                            </section>
+                        ))}
                         <div className="syntax-language">
                             <label htmlFor="syntax-language-select">Syntax highlighting</label>
                             <select

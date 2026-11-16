@@ -20,10 +20,16 @@ export const TemplateVariableSchema = z
         message: 'A dropdown needs at least one option.',
         path: ['options'],
     });
+export const EntryFieldsSchema = z.array(z.object({
+    label: z.string().trim().min(1).max(120),
+    value: z.string().max(10000),
+})).max(20);
+
 export const LibraryEntryDraftSchema = z.object({
     id: z.string().min(1).max(128).optional(),
     title: z.string().trim().min(1).max(200),
     content: z.string().max(500000).default(''),
+    fields: EntryFieldsSchema.optional(),
     syntax_language: z.enum(SYNTAX_LANGUAGE_VALUES).default('plaintext'),
     description: z.string().max(2000).optional(),
     category_id: z.string().max(128).optional(),
@@ -35,6 +41,8 @@ export const LibraryEntryDraftSchema = z.object({
 });
 
 export const EntryIdSchema = z.string().min(1).max(128);
+export const SetArchivedSchema = z.object({ id: EntryIdSchema, value: z.boolean() });
+export const SetSyntaxLanguageSchema = z.object({ id: EntryIdSchema, language: z.enum(SYNTAX_LANGUAGE_VALUES) });
 export const EntryIdsSchema = z.array(EntryIdSchema).min(1).max(5000).refine((ids) => new Set(ids).size === ids.length, {
     message: 'Entry IDs must be unique.',
 });
