@@ -14,6 +14,10 @@ const QUICK_CAPTURE_FLAG = '--quick-capture';
 
 let db: VeltoDatabase | null = null;
 let backupTimer: NodeJS.Timeout | null = null;
+let startup: Promise<void> | null = null;
+let backup: Promise<void> | null = null;
+let quitting = false;
+let quitReady = false;
 
 function configureApplicationMenu(): void {
     const template = [];
@@ -39,6 +43,9 @@ async function backupIfDue(): Promise<void> {
 
 async function startApplication(): Promise<void> {
     db = await initializeDatabase();
+    if (quitting) {
+        return;
+    }
     registerIpc(db, path.join(app.getPath('userData'), 'velto.db'));
     createTray([
         { label: 'Quick Search', click: quickSearch.toggle },
@@ -51,9 +58,20 @@ async function startApplication(): Promise<void> {
     preparePopups();
     await applyStoredSettings(db);
 
-    void backupIfDue();
-    backupTimer = setInterval(() => void backupIfDue(), AUTO_BACKUP_INTERVAL_MS / 4);
+    if (quitting) {
+        return;
+    }
+    scheduleBackup();
+    backupTimer = setInterval(scheduleBackup, AUTO_BACKUP_INTERVAL_MS / 4);
     backupTimer.unref();
+}
+
+function scheduleBackup(): void {
+    if (!backup) {
+        backup = backupIfDue().finally(() => {
+            backup = null;
+        });
+    }
 }
 
 if (squirrelStartup) {
@@ -74,7 +92,7 @@ if (squirrelStartup) {
 
     app.whenReady().then(() => {
         configureApplicationMenu();
-        void startApplication().catch((error) => {
+        startup = startApplication().catch((error) => {
             console.error('Failed to start Velto application:', error);
             app.quit();
         });
@@ -82,18 +100,36 @@ if (squirrelStartup) {
         app.on('activate', () => showLibrary());
     });
 
-    app.on('before-quit', () => {
+    app.on('before-quit', (event) => {
+        if (quitReady) {
+            return;
+        }
+        event.preventDefault();
+        if (quitting) {
+            return;
+        }
+        quitting = true;
         markQuitting();
         unregisterShortcuts();
         destroyTray();
         if (backupTimer) {
             clearInterval(backupTimer);
         }
-        if (db) {
-            const closing = db;
-            db = null;
-            void closeDatabase(closing).catch(() => undefined);
-        }
+        void (async () => {
+            await startup;
+            unregisterShortcuts();
+            destroyTray();
+            await backup;
+            if (db) {
+                await closeDatabase(db);
+                db = null;
+            }
+        })().catch((error: unknown) => {
+            console.error('Failed to close Velto database:', error);
+        }).finally(() => {
+            quitReady = true;
+            app.quit();
+        });
     });
 
     // Velto keeps running in the tray when every window is closed.

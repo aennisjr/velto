@@ -26,7 +26,7 @@ export function createSecureWindow(options: BrowserWindowConstructorOptions, rou
             contextIsolation: true,
             nodeIntegration: false,
             sandbox: true,
-            devTools: false,
+            devTools: Boolean(devServerUrl),
             preload: path.resolve(currentDir, '../../preload/index.cjs'),
         },
     });
