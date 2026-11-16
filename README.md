@@ -47,6 +47,7 @@ Install dependencies with `npm install`, then start the desktop app and Vite dev
 Useful checks:
 
 - `npm run typecheck` — TypeScript validation
+- `npm run lint` — ESLint checks
 - `npm test` — unit tests
 - `npm run test:e2e` — build and run the Electron end-to-end tests
 - `npm run build` — compile the main process, preload, and renderer
