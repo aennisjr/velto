@@ -1,6 +1,6 @@
 {
   "name": "velto",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Local-first desktop text library and canned response app",
   "main": "dist/src/main/index.js",
