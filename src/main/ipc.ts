@@ -43,6 +43,14 @@ export function registerIpc(db: Database, dbPath: string): void {
     let pendingImport: { file: LibraryFile; fileName: string } | null = null;
 
     ipcMain.handle('app:get-version', () => app.getVersion());
+    // Squirrel launches the app with --squirrel-firstrun right after installing it. Report that once per
+    // process so the library window can welcome the user without repeating when it is reopened.
+    let firstRunPending = process.argv.includes('--squirrel-firstrun');
+    ipcMain.handle('app:consume-first-run', () => {
+        const pending = firstRunPending;
+        firstRunPending = false;
+        return pending;
+    });
     ipcMain.handle('database:status', () => ({ ready: true, path: dbPath }));
     const backupDirectory = path.join(app.getPath('userData'), 'backups');
 

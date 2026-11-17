@@ -11,6 +11,8 @@ module.exports = {
         authors: 'Velto',
         setupExe: 'VeltoSetup.exe',
         setupIcon: 'assets/icon.ico',
+        // Squirrel has no wizard; this animation is the only feedback shown while it installs.
+        loadingGif: 'assets/installing.gif',
       },
     },
   ],

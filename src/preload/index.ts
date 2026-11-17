@@ -28,6 +28,7 @@ const api: VeltoApi = {
     applyImport: (mode) => ipcRenderer.invoke('library:apply-import', mode),
     cancelImport: () => ipcRenderer.invoke('library:cancel-import'),
     appVersion: () => ipcRenderer.invoke('app:get-version'),
+    consumeFirstRun: () => ipcRenderer.invoke('app:consume-first-run'),
     databaseStatus: () => ipcRenderer.invoke('database:status'),
     listEntries: (filter) => ipcRenderer.invoke('entries:list', filter),
     searchEntries: (query, filter) => ipcRenderer.invoke('entries:search', query, filter),

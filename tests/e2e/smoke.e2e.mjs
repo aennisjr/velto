@@ -24,7 +24,7 @@ try {
     assert.equal(await page.evaluate(() => typeof process), 'undefined', 'process must not leak into renderer');
     assert.deepEqual(
         await page.evaluate(() => Object.keys(window.velto).sort()),
-        ['appVersion', 'applyImport', 'backupInfo', 'backupNow', 'cancelImport', 'chooseImportFile', 'copyText', 'createCategory', 'createEntry', 'databaseStatus', 'deleteCategory', 'deleteEntries', 'deleteEntry', 'deleteTag', 'duplicateEntry', 'exportLibrary', 'getSettings', 'hideQuickCapture', 'hideQuickSearch', 'listCategories', 'listEntries', 'listTagUsage', 'listTags', 'onLibraryShown', 'onQuickCaptureShown', 'onQuickSearchShown', 'openBackupFolder', 'openLibrary', 'platform', 'readClipboard', 'renameCategory', 'renameTag', 'searchEntries', 'setArchived', 'setSyntaxLanguage', 'toggleFavorite', 'updateEntry', 'updateSettings'],
+        ['appVersion', 'applyImport', 'backupInfo', 'backupNow', 'cancelImport', 'chooseImportFile', 'consumeFirstRun', 'copyText', 'createCategory', 'createEntry', 'databaseStatus', 'deleteCategory', 'deleteEntries', 'deleteEntry', 'deleteTag', 'duplicateEntry', 'exportLibrary', 'getSettings', 'hideQuickCapture', 'hideQuickSearch', 'listCategories', 'listEntries', 'listTagUsage', 'listTags', 'onLibraryShown', 'onQuickCaptureShown', 'onQuickSearchShown', 'openBackupFolder', 'openLibrary', 'platform', 'readClipboard', 'renameCategory', 'renameTag', 'searchEntries', 'setArchived', 'setSyntaxLanguage', 'toggleFavorite', 'updateEntry', 'updateSettings'],
     );
     assert.equal(await app.evaluate(async ({ BrowserWindow }) => {
         const window = BrowserWindow.getAllWindows()[0];

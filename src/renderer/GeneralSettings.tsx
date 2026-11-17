@@ -1,3 +1,4 @@
+import { formatAccelerator } from '../shared/shortcuts.js';
 import { useCallback, useEffect, useState } from 'react';
 import { FolderOpen, Keyboard, RotateCcw } from 'lucide-react';
 import {
@@ -50,10 +51,6 @@ export function acceleratorFromEvent(event: Pick<KeyboardEvent, 'code' | 'ctrlKe
 function errorText(caught: unknown): string {
     const message = caught instanceof Error ? caught.message : 'Something went wrong.';
     return message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
-}
-
-function show(accelerator: string): string {
-    return accelerator.replace(/\+/g, ' + ');
 }
 
 export default function GeneralSettings() {
@@ -125,7 +122,7 @@ export default function GeneralSettings() {
                         <div key={action} className="shortcut-row" data-testid={`shortcut-${action}`}>
                             <span className="shortcut-name">{LABELS[action]}</span>
                             <kbd data-testid={action === 'quickSearch' ? 'shortcut-status' : undefined}>
-                                {isRecording ? 'Press keys… (Esc to cancel)' : status.active ? show(status.active) : 'Not active'}
+                                {isRecording ? 'Press keys… (Esc to cancel)' : status.active ? formatAccelerator(status.active) : 'Not active'}
                             </kbd>
                             <button type="button" className="btn" onClick={() => setRecording(isRecording ? null : action)}>
                                 <Keyboard size={14} /> {isRecording ? 'Cancel' : 'Change'}
@@ -142,11 +139,11 @@ export default function GeneralSettings() {
                             </button>
                             {status.active === null && (
                                 <p className="warning-text" role="alert">
-                                    {show(status.preferred)} is in use by another app. Pick a different shortcut, or open {LABELS[action]} from the tray icon.
+                                    {formatAccelerator(status.preferred)} is in use by another app. Pick a different shortcut, or open {LABELS[action]} from the tray icon.
                                 </p>
                             )}
                             {status.active !== null && status.active !== status.preferred && (
-                                <p className="muted">{show(status.preferred)} is in use by another app, so {show(status.active)} is used instead.</p>
+                                <p className="muted">{formatAccelerator(status.preferred)} is in use by another app, so {formatAccelerator(status.active)} is used instead.</p>
                             )}
                         </div>
                     );

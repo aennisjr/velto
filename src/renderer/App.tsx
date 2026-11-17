@@ -7,7 +7,9 @@ import EntryEditor from './EntryEditor.js';
 import TemplateUse from './TemplateUse.js';
 import SyntaxContent from './SyntaxContent.js';
 import ThemeMenu from './ThemeMenu.js';
-import SettingsDialog from './SettingsDialog.js';
+import SettingsDialog from './SettingsDialog.js';
+import WelcomeDialog from './WelcomeDialog.js';
+
 
 type Mode = 'view' | 'edit' | 'new' | 'use';
 
@@ -48,6 +50,7 @@ export default function App() {
     const [error, setError] = useState<string | null>(null);
     const [savingLanguage, setSavingLanguage] = useState(false);
     const [appVersion, setAppVersion] = useState<string | null>(null);
+    const [welcomeOpen, setWelcomeOpen] = useState(false);
     const requestId = useRef(0);
     const searchRef = useRef<HTMLInputElement>(null);
     const toastTimer = useRef<number | undefined>(undefined);
@@ -104,6 +107,10 @@ export default function App() {
         void window.velto.appVersion().then(setAppVersion).catch((caught: unknown) => {
             setError(caught instanceof Error ? caught.message : 'Could not load app version.');
         });
+    }, []);
+
+    useEffect(() => {
+        void window.velto.consumeFirstRun().then(setWelcomeOpen).catch(() => undefined);
     }, []);
 
     // Show the first entry on load without disturbing an edit in progress.
@@ -591,6 +598,8 @@ export default function App() {
                     }}
                 />
             )}
+
+            {welcomeOpen && <WelcomeDialog onClose={() => setWelcomeOpen(false)} />}
 
             {toast && (
                 <div className="toast" role="status">

@@ -12,6 +12,10 @@ Velto is a local-first desktop text library and canned response app built for fa
 
 ## Using Velto
 
+### Install
+
+Run `VeltoSetup.exe`. Velto installs for your Windows account only, so you don't need administrator rights. An "Installing Velto…" window appears briefly. When it closes, Velto opens and confirms the installation, then shows where to find it and lists your shortcuts. Velto adds shortcuts to the Start menu and the desktop. After you close the window, Velto keeps running in the system tray so the shortcuts keep working.
+
 ### Open Quick Search
 
 Press **Ctrl+Shift+Space** from any app to open Quick Search. Type to find saved text, then use **Up/Down** to select a result and **Enter** to copy it to the clipboard. Press **Esc** to close the window. If another app already uses the shortcut, open Velto from its system-tray icon or change the shortcut in **Settings**.

@@ -10,7 +10,7 @@
     "dev": "npm run build:preload && tsc --project tsconfig.json && concurrently -k -n vite,electron \"vite --host 127.0.0.1 --strictPort\" \"wait-on http://127.0.0.1:5173 && cross-env VELTO_DEV_SERVER_URL=http://127.0.0.1:5173 electron-forge start\"",
     "build": "tsc --project tsconfig.json && npm run build:preload && vite build --config vite.config.ts",
     "test": "vitest run",
-    "test:e2e": "npm run build && node tests/e2e/smoke.e2e.mjs && node tests/e2e/transfer.e2e.mjs && node tests/e2e/shell.e2e.mjs && node tests/e2e/quick.e2e.mjs && node tests/e2e/organize.e2e.mjs && node tests/e2e/bulk-delete.e2e.mjs && node tests/e2e/capture.e2e.mjs && node tests/e2e/variables.e2e.mjs",
+    "test:e2e": "npm run build && node tests/e2e/smoke.e2e.mjs && node tests/e2e/transfer.e2e.mjs && node tests/e2e/shell.e2e.mjs && node tests/e2e/quick.e2e.mjs && node tests/e2e/organize.e2e.mjs && node tests/e2e/bulk-delete.e2e.mjs && node tests/e2e/capture.e2e.mjs && node tests/e2e/variables.e2e.mjs && node tests/e2e/welcome.e2e.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "package": "npm run build && electron-forge package",
