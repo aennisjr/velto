@@ -84,3 +84,9 @@ The test does not run the installer itself. Installer installation and in-place 
 - `src/database` — schema and migration definitions
 - `tests` — integration and unit coverage
 - `docs` — architecture and roadmap notes
+
+## License
+
+Copyright (C) 2026 Velto contributors.
+
+This project is licensed under the GNU General Public License, version 3 or (at your option) any later version. See [LICENSE](LICENSE).

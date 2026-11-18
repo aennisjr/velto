@@ -2,6 +2,7 @@
   "name": "velto",
   "version": "0.1.5",
   "private": true,
+  "license": "GPL-3.0-or-later",
   "description": "Local-first desktop text library and canned response app",
   "main": "dist/src/main/index.js",
   "type": "module",
