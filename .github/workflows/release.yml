@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Test upgrade from previous release
+        shell: pwsh
+        run: |
+          $previousTag = git tag --list 'v*' --sort=-v:refname |
+            Where-Object { $_ -ne $env:GITHUB_REF_NAME } |
+            Select-Object -First 1
+          if ($previousTag) {
+            npm run test:upgrade -- --from $previousTag
+          } else {
+            $rootCommit = git rev-list --max-parents=0 HEAD | Select-Object -First 1
+            npm run test:upgrade -- --from $rootCommit
+          }
+
+      - name: Build Windows installer
+        run: npm run make
+
+      - name: Create draft GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          draft: true
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: out/make/squirrel.windows/x64/VeltoSetup.exe

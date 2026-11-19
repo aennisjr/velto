@@ -20,12 +20,7 @@ let quitting = false;
 let quitReady = false;
 
 function configureApplicationMenu(): void {
-    const template = [];
-    if (process.platform === 'darwin') {
-        template.push({ role: 'appMenu' as const });
-    }
-    template.push({ role: 'fileMenu' as const }, { role: 'editMenu' as const });
-    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+    Menu.setApplicationMenu(null);
 }
 
 async function backupIfDue(): Promise<void> {

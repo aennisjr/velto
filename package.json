@@ -1,6 +1,6 @@
 {
   "name": "velto",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "license": "GPL-3.0-or-later",
   "description": "Local-first desktop text library and canned response app",
