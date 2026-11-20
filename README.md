@@ -2,6 +2,8 @@
 
 Velto is a local-first desktop text library and canned response app built for fast retrieval, reusable snippets, and template-driven communication.
 
+![alt text](docs/screenshots/Screenshot-1.png)
+
 ## Product focus
 
 - local-first storage with SQLite
