@@ -17,8 +17,7 @@
     "outDir": "dist",
     "rootDir": ".",
     "jsx": "react-jsx",
-    "types": ["vitest/globals", "node"],
-    "baseUrl": "."
+    "types": ["vitest/globals", "node"]
   },
   "include": ["src/**/*", "tests/**/*", "vite.config.ts"]
 }
